@@ -348,7 +348,14 @@ def rules(obj: Figure):
             pos = tuple(board[x][y])
             if on_way(pos):
                 continue
-            obj.moves.append(pos)
+            under_attack = False
+            for f in list_of_figures:
+                if f.color != obj.color:
+                    for x_y in f.attack_moves:
+                        if tuple(x_y) == pos:
+                            under_attack = True
+            if not under_attack:
+                obj.moves.append(pos)
 
     def queen(board: np.array):
         rook(board)
