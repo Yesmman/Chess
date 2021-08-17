@@ -1,3 +1,4 @@
+from pygame import Rect
 class Figure:
     def __init__(self, name, color="white"):
         self.start_position = (0, 0)
@@ -20,7 +21,8 @@ class Figure:
         self.image = f"{self.name}_{self.color}.png"
 
     def do_move(self, position):
-        self.current_position = position
+        if position in self.moves:
+            self.current_position = position
 
     def can_move(self, position):
         if position in self.moves:
@@ -32,3 +34,12 @@ class Figure:
 
     def __repr__(self):
         return self.name
+
+
+class Cells(Rect):
+    def __init__(self, rect):
+        super().__init__(rect)
+
+        self.standard_color = "red"
+        self.color = self.standard_color
+        self.is_active = False
