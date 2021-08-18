@@ -1,4 +1,6 @@
 from pygame import Rect
+
+
 class Figure:
     def __init__(self, name, color="white"):
         self.start_position = (0, 0)
@@ -10,6 +12,8 @@ class Figure:
         self.set_image()
         self.moves = []
         self.attack_moves = []
+        self.under_check = False
+        self.prev_move = ()
 
     def block_move(self):
         self.move_is_enable = False
@@ -21,8 +25,8 @@ class Figure:
         self.image = f"{self.name}_{self.color}.png"
 
     def do_move(self, position):
-        if position in self.moves:
-            self.current_position = position
+        self.prev_move = self.current_position
+        self.current_position = position
 
     def can_move(self, position):
         if position in self.moves:
@@ -31,6 +35,9 @@ class Figure:
     def can_attack(self, position):
         if position in self.attack_moves:
             return True
+
+    def cancel_move(self):
+        self.current_position = self.prev_move
 
     def __repr__(self):
         return self.name
@@ -43,3 +50,4 @@ class Cells(Rect):
         self.standard_color = "red"
         self.color = self.standard_color
         self.is_active = False
+        self.under_check = False

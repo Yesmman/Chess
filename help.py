@@ -44,7 +44,7 @@ dict_color = {
     False: "Pink"
 }
 #
-k = False
+k = True
 
 list_of_figures = []
 list_of_coordinates = []
@@ -93,7 +93,7 @@ def set_start_position():
 
     black_index = 0
     white_index = 0
-    # print(black_index, white_index)
+
     for index in range(len(rooks)):
         if rooks[index].color == "black":
             rooks[index].start_position = chessboard[0][black_index]
@@ -101,13 +101,12 @@ def set_start_position():
         else:
             rooks[index].start_position = chessboard[7][white_index]
             white_index += 7
-    # for item in rooks:
-    #    print(item.start_position)
+
     black_index = 2
     white_index = 2
 
     for index in range(len(bishops)):
-        if rooks[index].color == "black":
+        if bishops[index].color == "black":
             bishops[index].start_position = chessboard[0][black_index]
             black_index += 3
         else:
@@ -118,7 +117,7 @@ def set_start_position():
     white_index = 1
 
     for index in range(len(knights)):
-        if rooks[index].color == "black":
+        if knights[index].color == "black":
             knights[index].start_position = chessboard[0][black_index]
             black_index += 5
         else:
@@ -126,13 +125,13 @@ def set_start_position():
             white_index += 5
 
     for index in range(len(kings)):
-        if rooks[index].color == "black":
+        if kings[index].color == "black":
             kings[index].start_position = chessboard[0][4]
         else:
             kings[index].start_position = chessboard[7][4]
 
     for index in range(len(queens)):
-        if rooks[index].color == "black":
+        if queens[index].color == "black":
             queens[index].start_position = chessboard[0][3]
         else:
             queens[index].start_position = chessboard[7][3]
@@ -166,6 +165,8 @@ def draw_chess_board():
             pygame.draw.rect(screen, color="lightblue", rect=cell)
         else:
             pygame.draw.rect(screen, color=cell.color, rect=cell)
+        if cell.under_check:
+            pygame.draw.rect(screen, color="red", rect=cell)
 
 
 def add_images():
@@ -185,12 +186,13 @@ def update_figures(list_):
         f.current_position = f.start_position
 
 
-def get_col(number):
-    return number % 8
-
-
-def get_raw(number):
-    return int(number / 8)
+def check_king_under_attack(king: Figure, pos):
+    for f in list_of_figures:
+        if f.color != king.color:
+            for x_y in f.attack_moves:
+                if tuple(x_y) == pos:
+                    return True
+    return False
 
 
 def rules(obj: Figure):
@@ -215,11 +217,18 @@ def rules(obj: Figure):
         return False
 
     def pawn(board: np.array):
-
+        obj.attack_moves.clear()
+        cant_move = False
         index = get_index()
-        obj.moves.append(tuple(board[index[0] + pawn_dict[obj.color], index[1]]))
+        pos = tuple(board[index[0] + pawn_dict[obj.color], index[1]])
+        if not on_way(pos):
+            obj.moves.append(pos)
+        else:
+            cant_move = True
         if tuple(obj.current_position) == tuple(obj.start_position):
-            obj.moves.append(tuple(board[index[0] + 2 * pawn_dict[obj.color], index[1]]))
+            pos = tuple(board[index[0] + 2 * pawn_dict[obj.color], index[1]])
+            if not on_way(pos) and not cant_move:
+                obj.moves.append(pos)
         try:
             obj.attack_moves.append(tuple(board[index[0] + pawn_dict[obj.color], index[1] + 1]))
         except IndexError:
@@ -238,9 +247,9 @@ def rules(obj: Figure):
             if x < 0:
                 break
             pos = tuple(board[x][y])
+            obj.moves.append(pos)
             if on_way(pos):
                 break
-            obj.moves.append(pos)
 
         x, y = index.copy()
         for c in range(8):
@@ -248,9 +257,9 @@ def rules(obj: Figure):
             if x > 7:
                 break
             pos = tuple(board[x][y])
+            obj.moves.append(pos)
             if on_way(pos):
                 break
-            obj.moves.append(pos)
 
         x, y = index.copy()
         for c in range(8):
@@ -258,9 +267,9 @@ def rules(obj: Figure):
             if y < 0:
                 break
             pos = tuple(board[x][y])
+            obj.moves.append(pos)
             if on_way(pos):
                 break
-            obj.moves.append(pos)
 
         x, y = index.copy()
         for c in range(8):
@@ -268,10 +277,10 @@ def rules(obj: Figure):
             if y > 7:
                 break
             pos = tuple(board[x][y])
+            obj.moves.append(pos)
 
             if on_way(pos):
                 break
-            obj.moves.append(pos)
 
     def bishop(board: np.array):
         index = get_index()
@@ -282,9 +291,9 @@ def rules(obj: Figure):
             if x < 0 or y < 0:
                 break
             pos = tuple(board[x][y])
+            obj.moves.append(pos)
             if on_way(pos):
                 break
-            obj.moves.append(pos)
 
         x, y = index.copy()
         for c in range(8):
@@ -293,9 +302,9 @@ def rules(obj: Figure):
             if x > 7 or y > 7:
                 break
             pos = tuple(board[x][y])
+            obj.moves.append(pos)
             if on_way(pos):
                 break
-            obj.moves.append(pos)
 
         x, y = index.copy()
         for c in range(8):
@@ -304,9 +313,9 @@ def rules(obj: Figure):
             if y < 0 or x > 7:
                 break
             pos = tuple(board[x][y])
+            obj.moves.append(pos)
             if on_way(pos):
                 break
-            obj.moves.append(pos)
 
         x, y = index.copy()
         for c in range(8):
@@ -316,9 +325,9 @@ def rules(obj: Figure):
                 break
             pos = tuple(board[x][y])
 
+            obj.moves.append(pos)
             if on_way(pos):
                 break
-            obj.moves.append(pos)
 
     def knight(board: np.array):
         index = get_index()
@@ -330,9 +339,6 @@ def rules(obj: Figure):
             if x < 0 or y < 0 or x > 7 or y > 7:
                 continue
             pos = tuple(board[x][y])
-
-            if on_way(pos):
-                continue
             obj.moves.append(pos)
 
     def king(board: np.array):
@@ -346,15 +352,9 @@ def rules(obj: Figure):
                 continue
 
             pos = tuple(board[x][y])
-            if on_way(pos):
-                continue
-            under_attack = False
-            for f in list_of_figures:
-                if f.color != obj.color:
-                    for x_y in f.attack_moves:
-                        if tuple(x_y) == pos:
-                            under_attack = True
-            if not under_attack:
+
+            under_attack_ = check_king_under_attack(obj, pos)
+            if not under_attack_:
                 obj.moves.append(pos)
 
     def queen(board: np.array):
@@ -379,7 +379,26 @@ def update_coordinates():
         rules(fg)
 
 
-#
+def check_check():
+    global king_under_check
+    for king in kings:
+
+        pos = tuple(king.current_position)
+        tuple_of_position = tuple(map(lambda x: (x.x, x.y), cells))
+
+        kings_cell = tuple_of_position.index(pos)
+
+        for fig in list_of_figures:
+            if fig.color != king.color:
+                if pos in fig.attack_moves:
+                    cells[kings_cell].under_check = True
+                    king.under_check = True
+                    king_under_check = king
+                    break
+                else:
+                    king.under_check = False
+
+
 create_chess_board()
 cells_chess_board()
 create_figures()
@@ -391,7 +410,14 @@ update_coordinates()
 running = True
 active_fig = False
 figure = None
-#
+current_king = None
+white_move = True
+
+all_moves = []
+q = {
+    True: "white",
+    False: "black"
+}
 while running:
 
     screen.fill("black")
@@ -414,12 +440,75 @@ while running:
                     coordinates = (item.x, item.y)
                     if not active_fig:
                         for fig in list_of_figures:
-                            if tuple(fig.current_position) == tuple(coordinates):
-                                figure = fig
-                                active_fig = True
-                                break
+                            if fig.color == q[white_move]:
+                                if tuple(fig.current_position) == tuple(coordinates):
+                                    figure = fig
+                                    active_fig = True
+                                    break
                     else:
+                        for fig in list_of_figures:
+                            if fig.color != figure.color:
+                                if coordinates == tuple(fig.current_position) and figure.can_attack(coordinates):
+                                    index = list_of_figures.index(fig)
+                                    popped = list_of_figures.pop(index)
+                                    if figure.can_move(coordinates):
+                                        figure.do_move(coordinates)
+                                        update_coordinates()
+                                        for king in kings:
+                                            if figure.color == king.color:
+                                                current_king = king
+                                                break
 
-                        figure.do_move(coordinates)
+                                        under_attack = check_king_under_attack(current_king,
+                                                                               tuple(current_king.current_position))
+                                        if under_attack:
+                                            figure.cancel_move()
+                                            list_of_figures.insert(index, popped)
+                                            update_coordinates()
+                                            active_fig = False
+                                            break
+                                        white_move = not white_move
+                                    elif figure.name == "pawn":
+                                        figure.do_move(coordinates)
+                                        update_coordinates()
+                                        for king in kings:
+                                            if figure.color == king.color:
+                                                current_king = king
+                                                break
+
+                                        under_attack = check_king_under_attack(current_king,
+                                                                               tuple(current_king.current_position))
+                                        if under_attack:
+                                            figure.cancel_move()
+                                            list_of_figures.insert(index, popped)
+                                            update_coordinates()
+                                            active_fig = False
+                                            break
+                                        white_move = not white_move
+                                    # list_of_figures.remove(fig)
+                                    break
+                            elif coordinates == tuple(fig.current_position):
+                                break
+                        else:
+                            if figure.can_move(coordinates):
+                                figure.do_move(coordinates)
+                                update_coordinates()
+                                for king in kings:
+                                    if figure.color == king.color:
+                                        current_king = king
+                                        break
+
+                                under_attack = check_king_under_attack(current_king,
+                                                                       tuple(current_king.current_position))
+                                if under_attack:
+                                    figure.cancel_move()
+                                    update_coordinates()
+                                    active_fig = False
+                                    break
+                                white_move = not white_move
+
                         active_fig = False
                     update_coordinates()
+            for cell in cells:
+                cell.under_check = False
+            check_check()
