@@ -24,4 +24,9 @@ class cell:
     def __repr__(self):
         return f"{self.number=}, {self.raw=}, {self.col=}"
 
-print(-2%5)
+
+l = [1, 2, 3, 4, 5]
+l2 = ["a", "b", "c", "d", "e"]
+
+for number, liter in zip(l, l2):
+    print(number, liter)

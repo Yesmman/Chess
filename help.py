@@ -1,28 +1,71 @@
 import pygame
 import pathlib
-from Figures import Figure, Cells
+from Figures import Figure, Cells, Client, Server, Net
 from functools import partial
+import threading as tr
 import numpy as np
 
-list_of_paths = []
-for path in pathlib.Path().glob(pattern="*.png"):
-    list_of_paths.append(path)
-WIDTH = 800
-HEIGHT = 800
 
-fps = 30
+list_of_figures = []
 
-pygame.init()
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Cheese")
+i_got_figures = False
+i_send_figures = False
 
-chessboard_list = []
-chessboard = np.array(object=object)
+pawns = []
+rooks = []
+knights = []
+bishops = []
+kings = []
+queens = []
+cells = []
+my_king: Figure
+my_figures = []
+opponent_figures = []
+
+your_move = True
+enemy_move = False
+counter_move = 0
+position_to_delete = ()
+images = {}
+screen: pygame.Surface
 
 
-# x+80, y+80
+
+def convert(list_: list):
+    for i in range(len(list_)):
+        x = list_[i].current_position[0]
+        y = list_[i].current_position[1]
+        y = 660 - y
+        x = 760 - x
+        new = (x, y)
+        list_[i].current_position = new
+        list_[i].color = "black"
+    return list_
+
+
+def convert_position(pos: tuple):
+    if len(pos) != 0:
+        x = pos[0]
+        y = pos[1]
+        x = 760 - x
+        y = 660 - y
+        return (x, y)
+    return ()
+
+
+def get_chess(client):
+    global opponent_figures, your_move, i_got_figures, your_move, position_to_delete
+    while True:
+        data = client.get_chess()
+        opponent_figures = convert(data["figures"])
+        your_move = not data["move"]
+        i_got_figures = data["reset"]
+        # your_move = data["reset"]
+        position_to_delete = convert_position(data["position"])
+
+
 def create_chess_board():
-    global chessboard
+    chessboard_list = []
     start_x = 100
     start_y = 50
     raw = []
@@ -37,138 +80,74 @@ def create_chess_board():
         start_y += 80
 
     chessboard = np.array(chessboard_list)
+    return chessboard
 
 
-dict_color = {
-    True: "White",
-    False: "Pink"
-}
-#
-k = {
-    "white": True,
-    "black": False
-}
-
-list_of_figures = []
-
-pawns = []
-rooks = []
-knights = []
-bishops = []
-kings = []
-queens = []
-cells = []
-color_cells = []
-
-my_figures = []
-opponent_figures = []
-
-
-def create_figures():
-    global list_of_figures
+def create_figures(reverse):
+    global my_figures
     for index in range(8):
-        pawns.append(Figure("pawn", "white"))
-        pawns.append(Figure("pawn", "black"))
+        pawns.append(Figure("pawn", reverse))
     for index in range(2):
-        knights.append(Figure("knight", "white"))
-        rooks.append(Figure("rook", "white"))
-        knights.append(Figure("knight", "black"))
-        rooks.append(Figure("rook", "black"))
-        bishops.append(Figure("bishop", "white"))
-        bishops.append(Figure("bishop", "black"))
-    kings.append(Figure("king", "white"))
-    kings.append(Figure("king", "black"))
-    queens.append(Figure("queen", "white"))
-    queens.append(Figure("queen", "black"))
-    list_of_figures = pawns + knights + rooks + bishops + kings + queens
+        knights.append(Figure("knight", reverse))
+        rooks.append(Figure("rook", reverse))
+        bishops.append(Figure("bishop", reverse))
+    kings.append(Figure("king", reverse))
+    queens.append(Figure("queen", reverse))
+    my_figures = pawns + knights + rooks + bishops + kings + queens
 
 
-def filter_figures(my_color):
-    for f in list_of_figures:
-        if f.color == my_color:
-            my_figures.append(f)
-        else:
-            opponent_figures.append(f)
-
-
-def set_start_position():
-    black_index = 0
-    white_index = 0
+def set_start_position(chessboard):
+    start_index = 0
     for index in range(len(pawns)):
-        if pawns[index].color == "black":
-            pawns[index].start_position = chessboard[1][black_index]
-            black_index += 1
-        else:
-            pawns[index].start_position = chessboard[6][white_index]
-            white_index += 1
+        pawns[index].start_position = chessboard[6][start_index]
+        start_index += 1
 
-    black_index = 0
-    white_index = 0
+    start_index = 0
 
     for index in range(len(rooks)):
-        if rooks[index].color == "black":
-            rooks[index].start_position = chessboard[0][black_index]
-            black_index += 7
-        else:
-            rooks[index].start_position = chessboard[7][white_index]
-            white_index += 7
+        rooks[index].start_position = chessboard[7][start_index]
+        start_index += 7
 
-    black_index = 2
-    white_index = 2
+    start_index = 2
 
     for index in range(len(bishops)):
-        if bishops[index].color == "black":
-            bishops[index].start_position = chessboard[0][black_index]
-            black_index += 3
-        else:
-            bishops[index].start_position = chessboard[7][white_index]
-            white_index += 3
+        bishops[index].start_position = chessboard[7][start_index]
+        start_index += 3
 
-    black_index = 1
-    white_index = 1
+    start_index = 1
 
     for index in range(len(knights)):
-        if knights[index].color == "black":
-            knights[index].start_position = chessboard[0][black_index]
-            black_index += 5
-        else:
-            knights[index].start_position = chessboard[7][white_index]
-            white_index += 5
+        knights[index].start_position = chessboard[7][start_index]
+        start_index += 5
 
-    for index in range(len(kings)):
-        if kings[index].color == "black":
-            kings[index].start_position = chessboard[0][4]
-        else:
-            kings[index].start_position = chessboard[7][4]
-
-    for index in range(len(queens)):
-        if queens[index].color == "black":
-            queens[index].start_position = chessboard[0][3]
-        else:
-            queens[index].start_position = chessboard[7][3]
+    kings[0].start_position = chessboard[7][4]
+    queens[0].start_position = chessboard[7][3]
 
 
-def cells_chess_board(color):
+def cells_chess_board(chessboard):
+    dict_color = {
+        True: "White",
+        False: "Pink"
+    }
+
+    k = True
     counter = 0
-    col = k[color]
     for index in range(len(chessboard)):
         for x, y in chessboard[index]:
             counter += 1
             rect = pygame.Rect(x, y, 80, 80)
 
             cell = Cells(rect)
-            if col:
-                cell.standard_color = dict_color[counter % 2 == 1]
-                cell.color = cell.standard_color
-            else:
-                cell.standard_color = dict_color[counter % 2 == 0]
-                cell.color = cell.standard_color
+            cell.standard_color = dict_color[k]
+            k = not k
+            cell.color = cell.standard_color
             if counter % 8 == 0:
-                col = not col
+                counter = 0
+                k = not k
             cells.append(cell)
 
 
-def draw_chess_board():
+def draw_chess_board(screen):
     for cell in cells:
         if cell.is_active:
             pygame.draw.rect(screen, color="lightblue", rect=cell)
@@ -176,13 +155,13 @@ def draw_chess_board():
             pygame.draw.rect(screen, color=cell.color, rect=cell)
         if cell.under_check:
             pygame.draw.rect(screen, color="red", rect=cell)
+        if cell.to_check:
+            pygame.draw.rect(screen, color="red", rect=cell)
 
 
-def add_images():
-    global list_of_figures
-    list_of_figures = pawns + rooks + knights + kings + queens + bishops
-    for f in list_of_figures:
-        f.image = pygame.image.load(f.image)
+def add_images(list_):
+    for f in list_:
+        images[f] = pygame.image.load(f.image)
 
 
 def de_highlight(list_):
@@ -192,26 +171,67 @@ def de_highlight(list_):
 
 def update_figures(list_):
     for f in list_:
-        f.current_position = f.start_position
+        f.current_position = tuple(f.start_position)
 
 
 def check_king_under_attack(pos):
     for f in opponent_figures:
         for x_y in f.attack_moves:
             if tuple(x_y) == pos:
+                print(f)
                 return True
     return False
 
 
-def rules(obj: Figure):
-    global list_of_figures
+def check_king_under_attack_(pos):
+    for f in opponent_figures:
+        for x_y in f.attack_moves:
+            if tuple(x_y) == pos:
+                print(f)
+                return True, f
+    return False, 0
+
+
+def get_king():
+    return kings[0]
+
+
+def get_queen():
+    return queens[0]
+
+
+def check_check(king: Figure):
+    global counter_move
+    print(counter_move)
+    bool_, f = check_king_under_attack_(king.current_position)
+    if bool_:
+        for cell in cells:
+            if (cell.x, cell.y) == king.current_position:
+                cell.under_check = True
+                if counter_move == 0 and f.name != "king":
+                    counter_move += 1
+                    pos = f.current_position
+                    for c in cells:
+                        if (c.x, c.y) == pos:
+                            c.to_check = True
+                            break
+                break
+
+
+def rules(obj: Figure, chessboard):
+    global list_of_figures, my_king
     obj.moves.clear()
     list_of_figures = my_figures + opponent_figures
+
+    pawn_dict = {
+        "black": 1,
+        "white": -1
+    }
 
     def get_index():
         for i_ in range(8):
             for j_ in range(8):
-                tup = tuple(chessboard[i_, j_])
+                tup = tuple(chessboard[i_][j_])
                 pos = tuple(obj.current_position)
                 if tup == pos:
                     return [i_, j_]
@@ -224,23 +244,69 @@ def rules(obj: Figure):
 
     def pawn(board: np.array):
         obj.attack_moves.clear()
+        if obj.current_position[1] == 50:
+            global screen
+            ims = ["queen_white.png",
+                   "rook_white.png",
+                   "bishop_white.png",
+                   "knight_white.png"]
+
+            real_images = []
+            for path in ims:
+                real_images.append(pygame.image.load(path))
+            samples = []
+            selecting = True
+            y = 50
+            x = 20
+            for i in range(4):
+                samples.append(pygame.Rect(x, y, 80, 80))
+                y += 80
+
+            while selecting:
+                for image in zip(samples, real_images):
+                    pygame.draw.rect(screen, "green", image[0])
+                    screen.blit(image[1], image[0])
+
+                pygame.display.flip()
+                position = pygame.mouse.get_pos()
+                for event in pygame.event.get():
+                    if event.type == pygame.MOUSEBUTTONDOWN:
+                        for i in range(len(ims)):
+                            if samples[i].collidepoint(position):
+                                if i == 0:
+                                    obj.name = "queen"
+                                    selecting = False
+                                elif i == 1:
+                                    obj.name = "rook"
+                                    selecting = False
+                                elif i == 2:
+                                    obj.name = "bishop"
+                                    selecting = False
+                                elif i == 3:
+                                    obj.name = "knight"
+                                    selecting = False
+
+                obj.set_image(False)
+                images[obj] = pygame.image.load(obj.image)
+
         cant_move = False
-        f_index = get_index()
-        pos = tuple(board[f_index[0] - 1, f_index[1]])
+        index = get_index()
+
+        pos = tuple(board[index[0] + pawn_dict[obj.color], index[1]])
         if not on_way(pos):
             obj.moves.append(pos)
         else:
             cant_move = True
         if tuple(obj.current_position) == tuple(obj.start_position):
-            pos = tuple(board[f_index[0] - 2, f_index[1]])
+            pos = tuple(board[index[0] + 2 * pawn_dict[obj.color], index[1]])
             if not on_way(pos) and not cant_move:
                 obj.moves.append(pos)
         try:
-            obj.attack_moves.append(tuple(board[f_index[0] - 1, f_index[1] + 1]))
+            obj.attack_moves.append(tuple(board[index[0] + pawn_dict[obj.color], index[1] + 1]))
         except IndexError:
             pass
         try:
-            obj.attack_moves.append(tuple(board[f_index[0] - 1, f_index[1] - 1]))
+            obj.attack_moves.append(tuple(board[index[0] + pawn_dict[obj.color], index[1] - 1]))
         except IndexError:
             pass
 
@@ -377,129 +443,240 @@ def rules(obj: Figure):
     if obj.name != "pawn":
         obj.attack_moves = obj.moves.copy()
 
+    if not my_king.did_move:
+        for r in my_figures:
+            if r.name == "rook" and not r.did_move:
+                if obj.current_position in r.moves:
+                    if r.current_position == tuple(chessboard[7][0]):
+                        king_roque_left = (r.current_position[0] + 160, r.current_position[1])
+                        # obj.moves.append(king_roque_left)
+                        obj.left_roque_move = king_roque_left
+                        r.right_roque_move = (king_roque_left[0] + 80, king_roque_left[1])
+                        obj.left_figure = r
+                    elif r.current_position == tuple(chessboard[7][7]):
+                        king_roque_right = (r.current_position[0] - 80, r.current_position[1])
+                        # obj.moves.append(king_roque_right)
+                        obj.right_roque_move = king_roque_right
+                        r.left_roque_move = (king_roque_right[0] - 80, king_roque_right[1])
+                        obj.right_figure = r
 
-def update_coordinates():
+
+def update_coordinates(chessboard):
     for fg in list_of_figures:
-        rules(fg)
+        rules(fg, chessboard)
 
 
-def check_check():
-    global my_king
-
-    pos = tuple(my_king.current_position)
-    tuple_of_position = tuple(map(lambda x: (x.x, x.y), cells))
-
-    kings_cell = tuple_of_position.index(pos)
-
-    for f in opponent_figures:
-        if pos in f.attack_moves:
-            cells[kings_cell].under_check = True
-            break
+def pick_data(pos=()):
+    # global your_move
+    d = {
+        "figures": my_figures.copy(),
+        "move": your_move,
+        "reset": True,
+        "position": pos
+    }
+    return d
 
 
-color = "white"
+def game():
+    global list_of_figures, pawns, rooks, knights, kings, bishops, queens, cells, opponent_figures, your_move, \
+        i_got_figures, i_send_figures, my_king, screen, counter_move
+    list_of_paths = []
 
-create_chess_board()
-cells_chess_board(color)
-create_figures()
-set_start_position()
-filter_figures(color)
-add_images()
-update_figures(list_of_figures)
-update_coordinates()
+    client = Client()
+    config = Net.host, Net.port
 
-running = True
-active_fig = False
-figure = None
-your_move = True
+    client.send_data(None, config)
+    i_am_black = False
+    color = client.get_chess()
+    if color == "black":
+        i_am_black = True
+        your_move = False
 
-all_moves = []
-q = {
-    True: "white",
-    False: "black"
-}
+    for path in pathlib.Path().glob(pattern="*.png"):
+        list_of_paths.append(path)
+    width = 800
+    height = 800
 
+    pygame.init()
+    screen = pygame.display.set_mode((width, height))
+    pygame.display.set_caption("Cheese")
 
-def get_king():
-    for f in my_figures:
-        if f.name == "king":
-            return f
+    chessboard = create_chess_board()
 
+    thread = tr.Thread(target=partial(get_chess, client), daemon=True)
 
-my_king = get_king()
+    cells_chess_board(chessboard)
+    create_figures(i_am_black)
+    set_start_position(chessboard)
+    my_king = get_king()
+    oh_no_my_queen = get_queen()
+    if color == "black":
+        my_king.start_position, oh_no_my_queen.start_position = oh_no_my_queen.start_position, my_king.start_position
 
-while running:
+    list_of_figures = opponent_figures + my_figures
+    add_images(list_of_figures)
 
-    screen.fill("black")
-    draw_chess_board()
-    i = 0
-    for fig in list_of_figures:
-        screen.blit(fig.image, fig.current_position)
-        i += 1
-    pygame.display.flip()
-    position = pygame.mouse.get_pos()
+    update_figures(list_of_figures)
+    update_coordinates(chessboard)
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            running = False
-        if event.type == pygame.MOUSEBUTTONDOWN:
-            for cell in cells:
-                if cell.collidepoint(position):
-                    de_highlight(cells)
-                    cell.is_active = True
-                    coordinates = (cell.x, cell.y)
-                    if not active_fig:
-                        for f in my_figures:
-                            if tuple(f.current_position) == tuple(coordinates):
-                                figure = f
-                                active_fig = True
-                                break
-                    else:
-                        for f in opponent_figures:
-                            if coordinates == tuple(f.current_position) and figure.can_attack(coordinates):
-                                index = opponent_figures.index(f)
-                                popped = list_of_figures.pop(index)
-                                if figure.can_move(coordinates):
-                                    figure.do_move(coordinates)
-                                    update_coordinates()
+    running = True
+    active_fig = False
+    figure = None
 
-                                    under_attack = check_king_under_attack(tuple(my_king.current_position))
-                                    if under_attack:
-                                        figure.cancel_move()
-                                        opponent_figures.insert(index, popped)
-                                        update_coordinates()
-                                        active_fig = False
+    thread.start()
+    yes = False
+    while running:
+
+        screen.fill("black")
+        draw_chess_board(screen)
+        i = 0
+        if i_got_figures:
+            if position_to_delete != ():
+                for f in my_figures:
+                    if f.current_position == position_to_delete:
+                        my_figures.remove(f)
+                        break
+
+            list_of_figures = my_figures.copy() + opponent_figures.copy()
+            images.clear()
+
+            for fig in list_of_figures:
+                fig.set_image(i_am_black)
+            add_images(list_of_figures)
+
+            i_got_figures = False
+            update_coordinates(chessboard)
+
+        for fig in list_of_figures:
+            screen.blit(images[fig], fig.current_position)
+            i += 1
+        pygame.display.flip()
+        position = pygame.mouse.get_pos()
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                for cell in cells:
+                    if cell.collidepoint(position):
+                        de_highlight(cells)
+                        cell.is_active = True
+                        coordinates = (cell.x, cell.y)
+                        if your_move:
+                            if not active_fig:
+                                for f in my_figures:
+                                    if tuple(f.current_position) == tuple(coordinates):
+                                        figure = f
+                                        active_fig = True
                                         break
-                                elif figure.name == "pawn":
-                                    figure.do_move(coordinates)
-                                    update_coordinates()
+                            else:
+                                for f in opponent_figures:
 
-                                    under_attack = check_king_under_attack(tuple(my_king.current_position))
-                                    if under_attack:
-                                        figure.cancel_move()
-                                        list_of_figures.insert(index, popped)
-                                        update_coordinates()
-                                        active_fig = False
+                                    if coordinates == tuple(f.current_position) and figure.can_attack(coordinates):
+                                        index = opponent_figures.index(f)
+                                        popped = opponent_figures.pop(index)
+                                        if figure.can_move(coordinates):
+                                            figure.do_move(coordinates)
+                                            update_coordinates(chessboard)
+
+                                            under_attack = check_king_under_attack(tuple(my_king.current_position))
+                                            if under_attack:
+                                                figure.cancel_move()
+                                                opponent_figures.insert(index, popped)
+                                                update_coordinates(chessboard)
+
+                                                break
+                                            else:
+                                                counter_move += 1
+                                                if counter_move == 2:
+                                                    your_move = False
+                                                    counter_move = 0
+                                                data = pick_data(coordinates)
+                                                client.send_data(data, config)
+                                                # your_move = False
+
+                                        elif figure.name == "pawn":
+                                            figure.do_move(coordinates)
+                                            update_coordinates(chessboard)
+
+                                            under_attack = check_king_under_attack(tuple(my_king.current_position))
+                                            if under_attack:
+                                                figure.cancel_move()
+                                                opponent_figures.insert(index, popped)
+                                                update_coordinates(chessboard)
+
+                                                break
+
+                                            else:
+                                                counter_move += 1
+                                                if counter_move == 2:
+                                                    your_move = False
+                                                    counter_move = 0
+                                                data = pick_data(coordinates)
+                                                client.send_data(data, config)
+                                                # your_move = False
+
                                         break
-                                    your_move = not your_move
-                                break
-                            elif coordinates == tuple(f.current_position):
-                                break
-                        else:
-                            if figure.can_move(coordinates):
-                                figure.do_move(coordinates)
-                                update_coordinates()
+                                    elif coordinates == tuple(f.current_position):
+                                        break
+                                else:
+                                    ok = True
+                                    for f in my_figures:
+                                        if f.current_position == coordinates and figure != f:
+                                            ok = False
+                                    if ok:
+                                        if figure.name == "king" and not figure.did_move:
+                                            if coordinates == figure.right_roque_move:
 
-                                under_attack = check_king_under_attack(tuple(my_king.current_position))
-                                if under_attack:
-                                    figure.cancel_move()
-                                    update_coordinates()
-                                    active_fig = False
-                                    break
-                                your_move = not your_move
+                                                figure.do_right_roque()
+                                                figure.right_figure.do_left_roque()
+                                                figure.did_move = True
+                                                counter_move += 1
+                                                if counter_move == 2:
+                                                    your_move = False
+                                                    counter_move = 0
+                                                data = pick_data(coordinates)
+                                                client.send_data(data, config)
+                                                # your_move = False
+                                                break
+                                            elif coordinates == figure.left_roque_move:
+                                                figure.do_left_roque()
+                                                figure.left_figure.do_right_roque()
+                                                figure.did_move = True
+                                                counter_move += 1
+                                                if counter_move == 2:
+                                                    your_move = False
+                                                    counter_move = 0
+                                                data = pick_data(coordinates)
+                                                client.send_data(data, config)
+                                                # your_move = False
+                                                break
+                                        if figure.can_move(coordinates):
+                                            figure.do_move(coordinates)
+                                            update_coordinates(chessboard)
 
-                        active_fig = False
-                    update_coordinates()
-            for cell in cells:
-                cell.under_check = False
-            # check_check()
+                                            under_attack = check_king_under_attack(tuple(my_king.current_position))
+                                            if under_attack:
+                                                figure.cancel_move()
+                                                update_coordinates(chessboard)
+                                                active_fig = False
+                                                break
+
+                                            else:
+                                                figure.did_move = True
+                                                counter_move += 1
+                                                if counter_move == 2:
+                                                    your_move = False
+                                                    counter_move = 0
+                                                data = pick_data()
+
+                                                client.send_data(data, config)
+                                                # your_move = False
+
+                                active_fig = False
+                            update_coordinates(chessboard)
+                    for cell in cells:
+                        cell.under_check = False
+                        cell.to_check = False
+
+                    check_check(my_king)
